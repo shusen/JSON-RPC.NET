@@ -5,8 +5,15 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace UnitTests
+namespace AustinHarris.JsonRpcTestN
 {
+    public class TreeNode
+    {
+        public int NodeId { get; set; }
+
+        public IList<TreeNode> Leafs { get; set; }
+    }
+
     public class CalculatorService : JsonRpcService
     {
         [JsonRpcMethod]
@@ -43,7 +50,6 @@ namespace UnitTests
         private List<string> StringToThrowingException(string input)
         {
             throw new Exception("Throwing Exception");
-            return new List<string>() { "one", "two", "three", input };
         }
 
         public class CustomString
@@ -72,6 +78,19 @@ namespace UnitTests
             var j = 15;
             return s + j / i;
         }
+
+        
+        [JsonRpcMethod] 
+        private bool TestCustomParameterName([JsonRpcParam("myCustomParameter")] string arg) 
+        { 
+            return true; 
+        } 
+
+        [JsonRpcMethod] 
+        private bool TestCustomParameterWithNoSpecificName([JsonRpcParam] string arg)
+        { 
+            return true; 
+        } 
 
         [JsonRpcMethod]
         private string StringToRefException(string s, ref JsonRpcException refException)
@@ -293,6 +312,7 @@ namespace UnitTests
                 input2
             };
         }
+
         [JsonRpcMethod]
         public bool TestOptionalParametersBoolsAndStrings(string input1, bool input2 = true, string input3 = "")
         {
@@ -304,5 +324,71 @@ namespace UnitTests
         {
             Trace.WriteLine(string.Format("Notified about: {0}", message));
         }
+
+        [JsonRpcMethod]
+        public string TestPreProcessor(string inputValue)
+        {
+            return "Success!";
+        }
+
+        [JsonRpcMethod]
+        public string TestPreProcessorThrowsJsonRPCException(string inputValue)
+        {
+            throw new JsonRpcException(-27000, "Just some testing", null);
+        }
+
+        [JsonRpcMethod]
+        public string TestPreProcessorThrowsException(string inputValue)
+        {
+            throw new Exception("TestException");
+        }
+
+        [JsonRpcMethod]
+        public string TestPreProcessorSetsException(string inputValue)
+        {
+            JsonRpcContext.SetException(new JsonRpcException(-27000, "This exception was thrown using: JsonRpcContext.SetException()", null));
+            return null;
+        }
+
+        [JsonRpcMethod]
+        public string TestPostProcessor(string inputValue)
+        {
+            return "Success!";
+        }
+
+        [JsonRpcMethod]
+        public string TestPostProcessorThrowsJsonRPCException(string inputValue)
+        {
+            throw new JsonRpcException(-27000, "Just some testing", null);
+        }
+
+        [JsonRpcMethod]
+        public string TestPostProcessorThrowsException(string inputValue)
+        {
+            throw new Exception("TestException");
+        }
+
+        [JsonRpcMethod]
+        public string TestPostProcessorSetsException(string inputValue)
+        {
+            JsonRpcContext.SetException(new JsonRpcException(-27001, "This exception was thrown using: JsonRpcContext.SetException()", null));
+            return null;
+        }
+
+        [JsonRpcMethod]
+        public TreeNode TestNestedReturnType()
+        {
+            return new TreeNode
+            {
+                NodeId = 1,
+                Leafs =
+                    new[]
+                    {
+                        new TreeNode {NodeId = 2, Leafs = new List<TreeNode>()},
+                        new TreeNode {NodeId = 3, Leafs = new List<TreeNode>()}
+                    }
+            };
+        }
+
     }
 }

@@ -34,31 +34,37 @@ namespace AustinHarris.JsonRpc
             TypeHashes = new List<string>();
 	    }
 
-        public void AddService(string method, Dictionary<string,Type> parameters, Dictionary<string, object> defaultValues)
+        internal void AddService(string method, Dictionary<string,Type> parameters, Dictionary<string, object> defaultValues, Delegate dele)
         {
-            var newService = new SMDService(transport,"JSON-RPC-2.0",parameters, defaultValues);
+            var newService = new SMDService(transport,"JSON-RPC-2.0",parameters, defaultValues, dele);
             Services.Add(method,newService);
         }
 
         public static int AddType(JObject jo)
         {
-            var hash = "t_" + jo.ToString().GetHashCode();
+            var hash = string.Format("t_{0}", jo.ToString().GetHashCode());
+            
             lock (TypeHashes)
-            {                
-                var idx = 0;
-                if (TypeHashes.Contains(hash) == false)
-                {
-                    TypeHashes.Add(hash);
-                    idx = TypeHashes.IndexOf(hash);                    
-                    Types.Add(idx, jo);
-                }
+            {
+                if (TypeHashes.Contains(hash)) return TypeHashes.IndexOf(hash);
+                
+                TypeHashes.Add(hash);
+                var idx = TypeHashes.IndexOf(hash);                    
+                Types.Add(idx, jo);
             }
+
             return TypeHashes.IndexOf(hash); 
+        }
+
+        public static bool ContainsType(JObject jo)
+        {
+            return TypeHashes.Contains(string.Format("t_{0}", jo.ToString().GetHashCode()));
         }
     }
 
     public class SMDService
     {
+        public Delegate dele;
         /// <summary>
         /// Defines a service method http://dojotoolkit.org/reference-guide/1.8/dojox/rpc/smd.html
         /// </summary>
@@ -66,9 +72,10 @@ namespace AustinHarris.JsonRpc
         /// <param name="envelope">URL, PATH, JSON, JSON-RPC-1.0, JSON-RPC-1.1, JSON-RPC-2.0</param>
         /// <param name="parameters"></param>
         /// <param name="defaultValues"></param>
-        public SMDService(string transport, string envelope, Dictionary<string, Type> parameters, Dictionary<string, object> defaultValues )
+        public SMDService(string transport, string envelope, Dictionary<string, Type> parameters, Dictionary<string, object> defaultValues, Delegate dele)
         {
             // TODO: Complete member initialization
+            this.dele = dele;
             this.transport = transport;
             this.envelope = envelope;
             this.parameters = new SMDAdditionalParameters[parameters.Count-1]; // last param is return type similar to Func<,>
@@ -163,10 +170,13 @@ namespace AustinHarris.JsonRpc
         {
             JObject jo = new JObject();
             jo.Add("__name", t.Name.ToLower());
-            if (isSimpleType(t))
+
+            if (isSimpleType(t) || SMD.ContainsType(jo))
             {                
                 return SMD.AddType(jo);
             }
+
+            var retVal = SMD.AddType(jo);
 
             var genArgs = t.GetGenericArguments();
             PropertyInfo[] properties = t.GetProperties();
@@ -225,7 +235,7 @@ namespace AustinHarris.JsonRpc
                 }
             }
 
-            return SMD.AddType(jo);
+            return retVal;
         }
 
         internal static bool isSimpleType(Type t)
