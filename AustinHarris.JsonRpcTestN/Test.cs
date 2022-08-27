@@ -1379,6 +1379,18 @@ namespace AustinHarris.JsonRpcTestN
             Assert.IsFalse(result.Result.Contains("error"));
             Assert.AreEqual(expectedResult, result.Result);
         }
+        
+        [TestCase("{method:\"TestDifferentOptionalParameters\",params:{location:\"loc1\", uid:\"abc123\", wavelengths: [0.0], traces: [0.0]},id:1}", ExpectedResult = "{\"jsonrpc\":\"2.0\",\"result\":\"this is the requested measurement\",\"id\":1}")]
+        [TestCase("{method:\"TestDifferentOptionalParameters\",params:{uid:\"abc123\", wavelengths: [0.0], traces: [0.0]},id:1}", ExpectedResult = "{\"jsonrpc\":\"2.0\",\"result\":\"this is the requested measurement\",\"id\":1}")]
+        [TestCase("{method:\"TestDifferentOptionalParameters\",params:{location:\"loc1\", uid:\"abc123\", traces: [0.0]},id:1}", ExpectedResult = "{\"jsonrpc\":\"2.0\",\"result\":\"this is the requested measurement\",\"id\":1}")]
+        [TestCase("{method:\"TestDifferentOptionalParameters\",params:{location:\"loc1\", uid:\"abc123\", wavelengths: [0.0]},id:1}", ExpectedResult = "{\"jsonrpc\":\"2.0\",\"result\":\"this is the requested measurement\",\"id\":1}")]
+        [TestCase("{method:\"TestDifferentOptionalParameters\",params:{uid:\"abc123\", wavelengths: [0.0]},id:1}", ExpectedResult = "{\"jsonrpc\":\"2.0\",\"result\":\"this is the requested measurement\",\"id\":1}")]
+        public string TestDifferentOptionalParametersNamedWorking(string request)
+        {
+            var result = JsonRpcProcessor.Process(request);
+            result.Wait();
+            return result.Result;
+        }
 
         [Test()]
         public void TestBatchResultWrongRequests()
@@ -1899,6 +1911,15 @@ namespace AustinHarris.JsonRpcTestN
             Assert.IsTrue(result.Result.Contains("\"code\":-32603"));
         }
 
+        [Test()]
+        public void TestWrongIdType()
+        {
+            string request = @"{method:'TestOptionalParamdouble',params:{input:5},id:{what:4,that:3}}";
+            var result = JsonRpcProcessor.Process(request);
+            result.Wait();
+            Assert.IsTrue(result.Result.Contains("error"));
+            Assert.IsTrue(result.Result.Contains("\"code\":-32600"));
+        }
 
         private static void AssertJsonAreEqual(string expectedJson, string actualJson)
         {

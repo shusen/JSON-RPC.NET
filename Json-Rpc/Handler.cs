@@ -267,6 +267,14 @@
                     }
                     else
                     {
+                        var foundDefault = metadata.defaultValues
+                            .FirstOrDefault(defaul => defaul.Name == metadata.parameters[i].Name);
+                        if (foundDefault != null)
+                        {
+                            parameters[i] = foundDefault.Value;
+                            continue;
+                        }
+                        
                         JsonResponse response = new JsonResponse()
                         {
                             Error = ProcessException(Rpc,
@@ -484,7 +492,7 @@
 
         private JsonRpcException PreProcess(JsonRequest request, object context)
         {
-            return externalPreProcessingHandler == null ? null : externalPreProcessingHandler(request, context);
+            return externalPreProcessingHandler?.Invoke(request, context);
         }
 
         private JsonResponse PostProcess(JsonRequest request, JsonResponse response, object context)

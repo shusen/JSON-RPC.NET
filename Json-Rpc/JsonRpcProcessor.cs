@@ -13,34 +13,41 @@ namespace AustinHarris.JsonRpc
 {
     public static class JsonRpcProcessor
     {
-        public static void Process(JsonRpcStateAsync async, object context = null)
+        public static void Process(JsonRpcStateAsync async, object context = null,
+            JsonSerializerSettings settings = null)
         {
-            Process(Handler.DefaultSessionId(), async, context);
+            Process(Handler.DefaultSessionId(), async, context, settings);
         }
 
-        public static void Process(string sessionId, JsonRpcStateAsync async, object context = null)
+        public static void Process(string sessionId, JsonRpcStateAsync async, object context = null,
+            JsonSerializerSettings settings = null)
         {
-            Process(sessionId, async.JsonRpc, context)
+            Process(sessionId, async.JsonRpc, context, settings)
                 .ContinueWith(t =>
-            {
-                async.Result = t.Result;
-                async.SetCompleted();
-            });
+                {
+                    async.Result = t.Result;
+                    async.SetCompleted();
+                });
         }
-        public static Task<string> Process(string jsonRpc, object context = null)
+
+        public static Task<string> Process(string jsonRpc, object context = null,
+            JsonSerializerSettings settings = null)
         {
-            return Process(Handler.DefaultSessionId(), jsonRpc, context);
+            return Process(Handler.DefaultSessionId(), jsonRpc, context, settings);
         }
-        public static Task<string> Process(string sessionId, string jsonRpc, object context = null)
-        { 
+
+        public static Task<string> Process(string sessionId, string jsonRpc, object context = null,
+            JsonSerializerSettings settings = null)
+        {
             return Task<string>.Factory.StartNew((_) =>
             {
-                var tuple = (Tuple<string, string, object>)_;
-                return ProcessInternal(tuple.Item1, tuple.Item2, tuple.Item3);
-            }, new Tuple<string, string, object>(sessionId, jsonRpc, context));
+                var tuple = (Tuple<string, string, object, JsonSerializerSettings>)_;
+                return ProcessSync(tuple.Item1, tuple.Item2, tuple.Item3, tuple.Item4);
+            }, new Tuple<string, string, object, JsonSerializerSettings>(sessionId, jsonRpc, context, settings));
         }
 
-        private static string ProcessInternal(string sessionId, string jsonRpc, object jsonRpcContext)
+        public static string ProcessSync(string sessionId, string jsonRpc, object jsonRpcContext,
+            JsonSerializerSettings settings = null)
         {
             var handler = Handler.GetSessionHandler(sessionId);
 
@@ -50,12 +57,12 @@ namespace AustinHarris.JsonRpc
             {
                 if (isSingleRpc(jsonRpc))
                 {
-                    var foo = JsonConvert.DeserializeObject<JsonRequest>(jsonRpc);
+                    var foo = JsonConvert.DeserializeObject<JsonRequest>(jsonRpc, settings);
                     batch = new[] { foo };
                 }
                 else
                 {
-                    batch = JsonConvert.DeserializeObject<JsonRequest[]>(jsonRpc);
+                    batch = JsonConvert.DeserializeObject<JsonRequest[]>(jsonRpc, settings);
                 }
             }
             catch (Exception ex)
@@ -63,7 +70,7 @@ namespace AustinHarris.JsonRpc
                 return Newtonsoft.Json.JsonConvert.SerializeObject(new JsonResponse
                 {
                     Error = handler.ProcessParseException(jsonRpc, new JsonRpcException(-32700, "Parse error", ex))
-                });
+                }, settings);
             }
 
             if (batch.Length == 0)
@@ -72,7 +79,7 @@ namespace AustinHarris.JsonRpc
                 {
                     Error = handler.ProcessParseException(jsonRpc,
                         new JsonRpcException(3200, "Invalid Request", "Batch of calls was empty."))
-                });
+                }, settings);
             }
 
             var singleBatch = batch.Length == 1;
@@ -92,6 +99,11 @@ namespace AustinHarris.JsonRpc
                 {
                     jsonResponse.Error = handler.ProcessParseException(jsonRpc,
                         new JsonRpcException(-32600, "Invalid Request", "Missing property 'method'"));
+                }
+                else if (!isSimpleValueType(jsonRequest.Id))
+                {
+                    jsonResponse.Error = handler.ProcessParseException(jsonRpc,
+                        new JsonRpcException(-32600, "Invalid Request", "Id property must be either null or string or integer."));
                 }
                 else
                 {
@@ -151,7 +163,7 @@ namespace AustinHarris.JsonRpc
                         sbResult = new StringBuilder("[");
                     }
 
-                    sbResult.Append(JsonConvert.SerializeObject(jsonResponse));
+                    sbResult.Append(JsonConvert.SerializeObject(jsonResponse, settings));
                     if (i < batch.Length - 1)
                     {
                         sbResult.Append(',');
@@ -173,6 +185,16 @@ namespace AustinHarris.JsonRpc
                 else if (json[i] == '[') return false;
             }
             return true;
+        }
+
+        private static bool isSimpleValueType(object property)
+        {
+            if (property == null)
+                return true;
+            return property.GetType() == typeof(System.String) ||
+                property.GetType() == typeof(System.Int64) ||
+                property.GetType() == typeof(System.Int32) ||
+                property.GetType() == typeof(System.Int16);
         }
     }
 }
